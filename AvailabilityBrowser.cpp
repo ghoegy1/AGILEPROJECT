@@ -1,0 +1,54 @@
+/***************************************************************************************
+ * AvailabilityBrowser.cpp — implementation
+ ****************************************************************************************/
+#include "AvailabilityBrowser.hpp"
+#include "Utils.hpp"
+#include <algorithm>
+
+namespace sb {
+
+bool AvailabilityBrowser::sameUser(const Profile& a, const Profile& b) {
+    // Prefer email identity if present; fallback to name
+    if (!a.email().empty() && !b.email().empty()) return a.email() == b.email();
+    if (!a.name().empty() && !b.name().empty()) return a.name() == b.name();
+    return &a == &b; // last resort: address
+}
+
+bool AvailabilityBrowser::hasCourse(const Profile& p, const std::string& normalizedCourse) {
+    for (const auto& c : p.courses()) {
+        if (c == normalizedCourse) return true;
+    }
+    return false;
+}
+
+std::vector<std::pair<std::string, std::vector<AvailabilitySlot>>>
+AvailabilityBrowser::browseByCourse(const std::vector<Profile>& all,
+                                    const Profile& self,
+                                    const std::string& courseCode) {
+    std::vector<std::pair<std::string, std::vector<AvailabilitySlot>>> out;
+    std::string norm = upperCopy(trim(courseCode));
+    for (const auto& p : all) {
+        if (sameUser(p, self)) continue;
+        if (hasCourse(p, norm)) {
+            out.push_back({p.name().empty() ? p.email() : p.name(), p.availability()});
+        }
+    }
+    return out;
+}
+
+std::vector<std::pair<std::string, std::vector<AvailabilitySlot>>>
+AvailabilityBrowser::browseByCourseAndDay(const std::vector<Profile>& all,
+                                          const Profile& self,
+                                          const std::string& courseCode,
+                                          Day day) {
+    auto base = browseByCourse(all, self, courseCode);
+    for (auto& entry : base) {
+        auto& slots = entry.second;
+        slots.erase(std::remove_if(slots.begin(), slots.end(),
+                   [day](const AvailabilitySlot& s){ return s.day != day; }),
+                   slots.end());
+    }
+    return base;
+}
+
+} // namespace sb
